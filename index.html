@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Embed PDF</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+
+      main {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      #pdfContainer {
+        border: 1px solid #ccc;
+      }
+
+      #thumbnails {
+        display: flex;
+        flex-direction: column;
+        width: 250px;
+        max-height: 3000px;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
+      #thumbnails canvas {
+        border: 1px solid #ccc;
+      }
+
+      #pageControls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.25rem 1.5rem;
+      }
+
+      #pageNumberControls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        column-gap: 0.5rem;
+      }
+
+      #pageNumberControls input {
+        border: 1px solid #ccc;
+        outline: none;
+        padding: 5px 8px;
+        border-radius: 4px;
+        max-width: 55px;
+      }
+
+      #pageControls button {
+        padding: 10px 20px;
+        margin: 0 5px;
+        cursor: pointer;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 14px;
+      }
+
+      #pageControls button:hover {
+        background-color: #2980b9;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="https://mozilla.github.io/pdf.js/build/pdf.js"></script>
+    <div id="pageControls">
+      <div>
+        <button id="prevPage">Previous Page</button>
+        <button id="nextPage">Next Page</button>
+        <button id="zoomIn">+</button>
+        <button id="zoomOut">-</button>
+      </div>
+      <div id="pageNumberControls">
+        <input type="number" value="1" id="pageNumber" />
+        <p id="pageStatus"></p>
+      </div>
+    </div>
+    <hr />
+
+    <main>
+      <div id="pdfContainer"></div>
+    </main>
+
+    <script>
+      const pdfContainer = document.getElementById("pdfContainer");
+      const thumbnailsContainer = document.getElementById("thumbnails");
+      const prevPageButton = document.getElementById("prevPage");
+      const nextPageButton = document.getElementById("nextPage");
+      const zoomIn = document.getElementById("zoomIn");
+      const zoomOut = document.getElementById("zoomOut");
+      const pageStatus = document.getElementById("pageStatus");
+      const pageNumber = document.getElementById("pageNumber");
+
+      const pdfUrl = "WHO-UCN-GMP-2022.01-Rev.2-eng.pdf";
+
+      // The workerSrc property shall be specified.
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "//mozilla.github.io/pdf.js/build/pdf.worker.js";
+
+      let currentPage = 1;
+      let pdfDocument;
+      let scale = 1.8;
+
+      const renderPage = (pageNum) => {
+        pdfDocument.getPage(pageNum).then((page) => {
+          const canvas = document.createElement("canvas");
+          pdfContainer.innerHTML = "";
+          pdfContainer.appendChild(canvas);
+          const viewport = page.getViewport({ scale });
+          const context = canvas.getContext("2d");
+
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+          pageStatus.innerText =
+            "Page " + currentPage + " / " + pdfDocument.numPages;
+          pageNumber.value = currentPage;
+          //   / Scroll the pdfContainer to the top of the page
+          pdfContainer.scrollIntoView({ behavior: "smooth", block: "start" });
+          page.render({ canvasContext: context, viewport });
+        });
+      };
+
+      const loadPdf = () => {
+        pdfjsLib.getDocument(pdfUrl).promise.then((document) => {
+          pdfDocument = document;
+          renderPage(currentPage);
+          //   loadThumbnails();
+        });
+      };
+
+      const loadThumbnails = () => {
+        for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+          pdfDocument.getPage(pageNum).then((page) => {
+            const thumbnailCanvas = document.createElement("canvas");
+            thumbnailsContainer.appendChild(thumbnailCanvas);
+            const thumbnailScale = 0.5;
+            const thumbnailViewport = page.getViewport({
+              scale: thumbnailScale,
+            });
+            const thumbnailContext = thumbnailCanvas.getContext("2d");
+
+            thumbnailCanvas.height = thumbnailViewport.height;
+            thumbnailCanvas.width = thumbnailViewport.width;
+
+            page.render({
+              canvasContext: thumbnailContext,
+              viewport: thumbnailViewport,
+            });
+          });
+        }
+      };
+
+      prevPageButton.addEventListener("click", () => {
+        if (currentPage > 1) {
+          currentPage--;
+          renderPage(currentPage);
+        }
+      });
+
+      nextPageButton.addEventListener("click", () => {
+        if (currentPage < pdfDocument.numPages) {
+          currentPage++;
+          renderPage(currentPage);
+        }
+      });
+
+      zoomIn.addEventListener("click", () => {
+        if (scale > 5) {
+          return;
+        }
+        scale += 0.1;
+        renderPage(currentPage);
+      });
+
+      zoomOut.addEventListener("click", () => {
+        if (scale < 0.25) {
+          return;
+        }
+        scale -= 0.1;
+        renderPage(currentPage);
+      });
+
+      pageNumber.addEventListener("change", () => {
+        const page = parseInt(pageNumber.value.trim());
+        if (!page || page == 0 || page > pdfDocument.numPages) return;
+
+        currentPage = page;
+        renderPage(currentPage);
+      });
+
+      document.addEventListener("keyup", (event) => {
+        if (event.key == "ArrowRight") {
+          if (currentPage < pdfDocument.numPages) {
+            currentPage++;
+            renderPage(currentPage);
+          }
+        } else if (event.key == "ArrowLeft") {
+          if (currentPage > 1) {
+            currentPage--;
+            renderPage(currentPage);
+          }
+        }
+      });
+
+      loadPdf();
+    </script>
+  </body>
+</html>
